@@ -1,292 +1,271 @@
 --[[ 
-    Script para 99 Noites na Floresta - Estilo VapeVoidware
-    Desenvolvido por Manus AI
+    VOIDWARE - 99 Nights in the Forest
+    Versão Otimizada por Manus AI
     Baseado no VapeVoidware original
-    
-    Funcionalidades implementadas:
-    - Fly (Voo) com BodyVelocity/VectorForce
-    - NoClip (Atravessar paredes)
-    - Infinite Jump (Pulo infinito)
-    - Speed (Velocidade)
-    - Fullbright (Iluminação total)
-    - Bring Items (Puxar itens)
-    - Teleport Children (Teleportar crianças)
-    - Kill Aura (Matar inimigos próximos)
-    - Auto Farm Trees (Cortar árvores automaticamente)
-    - ESP (Mostrar objetos através das paredes)
 ]]
 
--- Aguardar o jogo carregar
+-- Aguardar carregamento
 repeat task.wait() until game:IsLoaded()
 
--- Serviços do Roblox
+-- Serviços
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
-local TweenService = game:GetService("TweenService")
 
 -- Variáveis principais
 local player = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
-local rootPart = character:WaitForChild("HumanoidRootPart")
+local mouse = player:GetMouse()
 
--- Criar GUI principal
+-- Estados das funcionalidades
+local states = {
+    fly = false,
+    noclip = false,
+    infiniteJump = false,
+    fullbright = false,
+    bringItems = false,
+    teleportChildren = false,
+    killAura = false,
+    treeFarm = false,
+    esp = false,
+    speed = 16
+}
+
+-- Backup das configurações originais
+local originalSettings = {
+    brightness = Lighting.Brightness,
+    ambient = Lighting.Ambient,
+    fogEnd = Lighting.FogEnd
+}
+
+-- Criar GUI
 local gui = Instance.new("ScreenGui")
-gui.Parent = player:WaitForChild("PlayerGui")
 gui.Name = "VoidwareGUI"
+gui.Parent = player:WaitForChild("PlayerGui")
 gui.ResetOnSpawn = false
 
--- Janela principal
-local mainFrame = Instance.new("Frame")
-mainFrame.Name = "MainFrame"
-mainFrame.Parent = gui
-mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-mainFrame.BorderColor3 = Color3.fromRGB(100, 100, 100)
-mainFrame.BorderSizePixel = 2
-mainFrame.Position = UDim2.new(0.5, -300, 0.5, -200)
-mainFrame.Size = UDim2.new(0, 600, 0, 400)
-mainFrame.Draggable = true
-mainFrame.Active = true
+-- Frame principal
+local main = Instance.new("Frame")
+main.Name = "Main"
+main.Parent = gui
+main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+main.BorderSizePixel = 0
+main.Position = UDim2.new(0.5, -250, 0.5, -175)
+main.Size = UDim2.new(0, 500, 0, 350)
+main.Draggable = true
+main.Active = true
 
 -- Cantos arredondados
 local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 10)
-corner.Parent = mainFrame
+corner.CornerRadius = UDim.new(0, 8)
+corner.Parent = main
 
 -- Título
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Name = "Title"
-titleLabel.Parent = mainFrame
-titleLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Size = UDim2.new(1, 0, 0, 40)
-titleLabel.Text = "VOIDWARE - 99 Nights in the Forest"
-titleLabel.Font = Enum.Font.SourceSansBold
-titleLabel.TextSize = 20
+local title = Instance.new("TextLabel")
+title.Name = "Title"
+title.Parent = main
+title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+title.Size = UDim2.new(1, 0, 0, 35)
+title.Font = Enum.Font.SourceSansBold
+title.Text = "VOIDWARE - 99 Nights in the Forest"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextSize = 16
 
 local titleCorner = Instance.new("UICorner")
-titleCorner.CornerRadius = UDim.new(0, 10)
-titleCorner.Parent = titleLabel
+titleCorner.CornerRadius = UDim.new(0, 8)
+titleCorner.Parent = title
 
 -- Botão fechar
-local closeButton = Instance.new("TextButton")
-closeButton.Name = "CloseButton"
-closeButton.Parent = titleLabel
-closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-closeButton.Position = UDim2.new(1, -35, 0, 5)
-closeButton.Size = UDim2.new(0, 30, 0, 30)
-closeButton.Text = "X"
-closeButton.Font = Enum.Font.SourceSansBold
-closeButton.TextSize = 16
+local close = Instance.new("TextButton")
+close.Name = "Close"
+close.Parent = title
+close.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+close.Position = UDim2.new(1, -30, 0, 2.5)
+close.Size = UDim2.new(0, 25, 0, 25)
+close.Font = Enum.Font.SourceSansBold
+close.Text = "X"
+close.TextColor3 = Color3.fromRGB(255, 255, 255)
+close.TextSize = 14
 
 local closeCorner = Instance.new("UICorner")
-closeCorner.CornerRadius = UDim.new(0, 5)
-closeCorner.Parent = closeButton
+closeCorner.CornerRadius = UDim.new(0, 4)
+closeCorner.Parent = close
 
-closeButton.MouseButton1Click:Connect(function()
+close.MouseButton1Click:Connect(function()
     gui:Destroy()
 end)
 
 -- Função para criar botões
-local function createButton(parent, name, text, position, size, callback)
+local function createButton(name, text, position, callback)
     local button = Instance.new("TextButton")
     button.Name = name
-    button.Parent = parent
-    button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Parent = main
+    button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
     button.Position = position
-    button.Size = size
-    button.Text = text
+    button.Size = UDim2.new(0, 140, 0, 30)
     button.Font = Enum.Font.SourceSans
+    button.Text = text
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
     button.TextSize = 14
     
     local buttonCorner = Instance.new("UICorner")
-    buttonCorner.CornerRadius = UDim.new(0, 8)
+    buttonCorner.CornerRadius = UDim.new(0, 6)
     buttonCorner.Parent = button
-    
-    -- Efeito hover
-    button.MouseEnter:Connect(function()
-        button.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-    end)
-    
-    button.MouseLeave:Connect(function()
-        if button.Text:find("OFF") then
-            button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        else
-            button.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-        end
-    end)
     
     button.MouseButton1Click:Connect(callback)
     return button
 end
 
--- Variáveis de estado
-local flyEnabled = false
-local noclipEnabled = false
-local infiniteJumpEnabled = false
-local fullbrightEnabled = false
-local bringItemsEnabled = false
-local teleportChildrenEnabled = false
-local killAuraEnabled = false
-local treeFarmEnabled = false
-local espEnabled = false
-local speed = 16
-
--- Backup das configurações originais
-local originalBrightness = Lighting.Brightness
-local originalAmbient = Lighting.Ambient
-local originalFogEnd = Lighting.FogEnd
-
--- Criar botões da interface
-local flyButton = createButton(mainFrame, "FlyButton", "Fly (OFF)", 
-    UDim2.new(0.05, 0, 0.15, 0), UDim2.new(0.28, 0, 0.1, 0), function()
-    flyEnabled = not flyEnabled
-    flyButton.Text = flyEnabled and "Fly (ON)" or "Fly (OFF)"
-    flyButton.BackgroundColor3 = flyEnabled and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(50, 50, 50)
+-- Criar botões
+local flyBtn = createButton("Fly", "Fly [OFF]", UDim2.new(0, 20, 0, 50), function()
+    states.fly = not states.fly
+    flyBtn.Text = "Fly [" .. (states.fly and "ON" or "OFF") .. "]"
+    flyBtn.BackgroundColor3 = states.fly and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(60, 60, 60)
 end)
 
-local noclipButton = createButton(mainFrame, "NoclipButton", "NoClip (OFF)", 
-    UDim2.new(0.36, 0, 0.15, 0), UDim2.new(0.28, 0, 0.1, 0), function()
-    noclipEnabled = not noclipEnabled
-    noclipButton.Text = noclipEnabled and "NoClip (ON)" or "NoClip (OFF)"
-    noclipButton.BackgroundColor3 = noclipEnabled and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(50, 50, 50)
+local noclipBtn = createButton("NoClip", "NoClip [OFF]", UDim2.new(0, 180, 0, 50), function()
+    states.noclip = not states.noclip
+    noclipBtn.Text = "NoClip [" .. (states.noclip and "ON" or "OFF") .. "]"
+    noclipBtn.BackgroundColor3 = states.noclip and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(60, 60, 60)
 end)
 
-local infiniteJumpButton = createButton(mainFrame, "InfiniteJumpButton", "Infinite Jump (OFF)", 
-    UDim2.new(0.67, 0, 0.15, 0), UDim2.new(0.28, 0, 0.1, 0), function()
-    infiniteJumpEnabled = not infiniteJumpEnabled
-    infiniteJumpButton.Text = infiniteJumpEnabled and "Infinite Jump (ON)" or "Infinite Jump (OFF)"
-    infiniteJumpButton.BackgroundColor3 = infiniteJumpEnabled and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(50, 50, 50)
+local jumpBtn = createButton("InfJump", "Inf Jump [OFF]", UDim2.new(0, 340, 0, 50), function()
+    states.infiniteJump = not states.infiniteJump
+    jumpBtn.Text = "Inf Jump [" .. (states.infiniteJump and "ON" or "OFF") .. "]"
+    jumpBtn.BackgroundColor3 = states.infiniteJump and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(60, 60, 60)
 end)
 
-local fullbrightButton = createButton(mainFrame, "FullbrightButton", "Fullbright (OFF)", 
-    UDim2.new(0.05, 0, 0.3, 0), UDim2.new(0.28, 0, 0.1, 0), function()
-    fullbrightEnabled = not fullbrightEnabled
-    fullbrightButton.Text = fullbrightEnabled and "Fullbright (ON)" or "Fullbright (OFF)"
-    fullbrightButton.BackgroundColor3 = fullbrightEnabled and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(50, 50, 50)
+local brightBtn = createButton("Fullbright", "Fullbright [OFF]", UDim2.new(0, 20, 0, 90), function()
+    states.fullbright = not states.fullbright
+    brightBtn.Text = "Fullbright [" .. (states.fullbright and "ON" or "OFF") .. "]"
+    brightBtn.BackgroundColor3 = states.fullbright and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(60, 60, 60)
     
-    if fullbrightEnabled then
+    if states.fullbright then
         Lighting.Brightness = 2
         Lighting.Ambient = Color3.fromRGB(255, 255, 255)
         Lighting.FogEnd = 100000
     else
-        Lighting.Brightness = originalBrightness
-        Lighting.Ambient = originalAmbient
-        Lighting.FogEnd = originalFogEnd
+        Lighting.Brightness = originalSettings.brightness
+        Lighting.Ambient = originalSettings.ambient
+        Lighting.FogEnd = originalSettings.fogEnd
     end
 end)
 
-local bringItemsButton = createButton(mainFrame, "BringItemsButton", "Bring Items (OFF)", 
-    UDim2.new(0.36, 0, 0.3, 0), UDim2.new(0.28, 0, 0.1, 0), function()
-    bringItemsEnabled = not bringItemsEnabled
-    bringItemsButton.Text = bringItemsEnabled and "Bring Items (ON)" or "Bring Items (OFF)"
-    bringItemsButton.BackgroundColor3 = bringItemsEnabled and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(50, 50, 50)
+local itemsBtn = createButton("BringItems", "Bring Items [OFF]", UDim2.new(0, 180, 0, 90), function()
+    states.bringItems = not states.bringItems
+    itemsBtn.Text = "Bring Items [" .. (states.bringItems and "ON" or "OFF") .. "]"
+    itemsBtn.BackgroundColor3 = states.bringItems and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(60, 60, 60)
 end)
 
-local teleportChildrenButton = createButton(mainFrame, "TeleportChildrenButton", "Teleport Children (OFF)", 
-    UDim2.new(0.67, 0, 0.3, 0), UDim2.new(0.28, 0, 0.1, 0), function()
-    teleportChildrenEnabled = not teleportChildrenEnabled
-    teleportChildrenButton.Text = teleportChildrenEnabled and "Teleport Children (ON)" or "Teleport Children (OFF)"
-    teleportChildrenButton.BackgroundColor3 = teleportChildrenEnabled and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(50, 50, 50)
+local childrenBtn = createButton("TpChildren", "Tp Children [OFF]", UDim2.new(0, 340, 0, 90), function()
+    states.teleportChildren = not states.teleportChildren
+    childrenBtn.Text = "Tp Children [" .. (states.teleportChildren and "ON" or "OFF") .. "]"
+    childrenBtn.BackgroundColor3 = states.teleportChildren and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(60, 60, 60)
 end)
 
-local killAuraButton = createButton(mainFrame, "KillAuraButton", "Kill Aura (OFF)", 
-    UDim2.new(0.05, 0, 0.45, 0), UDim2.new(0.28, 0, 0.1, 0), function()
-    killAuraEnabled = not killAuraEnabled
-    killAuraButton.Text = killAuraEnabled and "Kill Aura (ON)" or "Kill Aura (OFF)"
-    killAuraButton.BackgroundColor3 = killAuraEnabled and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(50, 50, 50)
+local killBtn = createButton("KillAura", "Kill Aura [OFF]", UDim2.new(0, 20, 0, 130), function()
+    states.killAura = not states.killAura
+    killBtn.Text = "Kill Aura [" .. (states.killAura and "ON" or "OFF") .. "]"
+    killBtn.BackgroundColor3 = states.killAura and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(60, 60, 60)
 end)
 
-local treeFarmButton = createButton(mainFrame, "TreeFarmButton", "Tree Farm (OFF)", 
-    UDim2.new(0.36, 0, 0.45, 0), UDim2.new(0.28, 0, 0.1, 0), function()
-    treeFarmEnabled = not treeFarmEnabled
-    treeFarmButton.Text = treeFarmEnabled and "Tree Farm (ON)" or "Tree Farm (OFF)"
-    treeFarmButton.BackgroundColor3 = treeFarmEnabled and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(50, 50, 50)
+local treeBtn = createButton("TreeFarm", "Tree Farm [OFF]", UDim2.new(0, 180, 0, 130), function()
+    states.treeFarm = not states.treeFarm
+    treeBtn.Text = "Tree Farm [" .. (states.treeFarm and "ON" or "OFF") .. "]"
+    treeBtn.BackgroundColor3 = states.treeFarm and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(60, 60, 60)
 end)
 
-local espButton = createButton(mainFrame, "ESPButton", "ESP (OFF)", 
-    UDim2.new(0.67, 0, 0.45, 0), UDim2.new(0.28, 0, 0.1, 0), function()
-    espEnabled = not espEnabled
-    espButton.Text = espEnabled and "ESP (ON)" or "ESP (OFF)"
-    espButton.BackgroundColor3 = espEnabled and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(50, 50, 50)
+local espBtn = createButton("ESP", "ESP [OFF]", UDim2.new(0, 340, 0, 130), function()
+    states.esp = not states.esp
+    espBtn.Text = "ESP [" .. (states.esp and "ON" or "OFF") .. "]"
+    espBtn.BackgroundColor3 = states.esp and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(60, 60, 60)
 end)
 
 -- Controle de velocidade
 local speedLabel = Instance.new("TextLabel")
-speedLabel.Name = "SpeedLabel"
-speedLabel.Parent = mainFrame
+speedLabel.Parent = main
 speedLabel.BackgroundTransparency = 1
-speedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-speedLabel.Position = UDim2.new(0.05, 0, 0.6, 0)
-speedLabel.Size = UDim2.new(0.9, 0, 0.08, 0)
-speedLabel.Text = "Walk Speed: " .. speed
+speedLabel.Position = UDim2.new(0, 20, 0, 180)
+speedLabel.Size = UDim2.new(0, 460, 0, 25)
 speedLabel.Font = Enum.Font.SourceSans
-speedLabel.TextSize = 16
+speedLabel.Text = "Walk Speed: " .. states.speed
+speedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedLabel.TextSize = 14
 
-local speedFrame = Instance.new("Frame")
-speedFrame.Name = "SpeedFrame"
-speedFrame.Parent = mainFrame
-speedFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-speedFrame.Position = UDim2.new(0.05, 0, 0.68, 0)
-speedFrame.Size = UDim2.new(0.9, 0, 0.08, 0)
-
-local speedFrameCorner = Instance.new("UICorner")
-speedFrameCorner.CornerRadius = UDim.new(0, 8)
-speedFrameCorner.Parent = speedFrame
-
-local decreaseSpeedButton = createButton(speedFrame, "DecreaseSpeedButton", "-", 
-    UDim2.new(0, 5, 0, 5), UDim2.new(0, 40, 1, -10), function()
-    speed = math.max(8, speed - 8)
-    speedLabel.Text = "Walk Speed: " .. speed
-    if character and character:FindFirstChild("Humanoid") then
-        character.Humanoid.WalkSpeed = speed
+local speedDown = createButton("SpeedDown", "-", UDim2.new(0, 20, 0, 210), function()
+    states.speed = math.max(8, states.speed - 8)
+    speedLabel.Text = "Walk Speed: " .. states.speed
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid.WalkSpeed = states.speed
     end
 end)
+speedDown.Size = UDim2.new(0, 40, 0, 30)
 
-local increaseSpeedButton = createButton(speedFrame, "IncreaseSpeedButton", "+", 
-    UDim2.new(1, -45, 0, 5), UDim2.new(0, 40, 1, -10), function()
-    speed = math.min(200, speed + 8)
-    speedLabel.Text = "Walk Speed: " .. speed
-    if character and character:FindFirstChild("Humanoid") then
-        character.Humanoid.WalkSpeed = speed
+local speedUp = createButton("SpeedUp", "+", UDim2.new(0, 440, 0, 210), function()
+    states.speed = math.min(200, states.speed + 8)
+    speedLabel.Text = "Walk Speed: " .. states.speed
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid.WalkSpeed = states.speed
     end
 end)
+speedUp.Size = UDim2.new(0, 40, 0, 30)
 
-print("🌙 VOIDWARE - 99 Nights in the Forest carregado!")
-print("📱 Interface criada - Desenvolvido por Manus AI")
-print("🎮 Baseado no VapeVoidware original")
+-- Lista otimizada de itens importantes
+local importantItems = {
+    "Wood", "Stone", "Coal", "Iron", "Gold", "Diamond",
+    "Bandage", "Medkit", "Flashlight", "Axe", "Pickaxe"
+}
 
--- Funcionalidades principais
+-- Lista de crianças
+local children = {"Dino Kid", "Kraken Kid", "Squid Kid", "Koala Kid"}
 
 -- Variáveis para voo
 local bodyVelocity = nil
 local bodyAngularVelocity = nil
 
--- Função de voo melhorada (baseada no VapeVoidware)
-local function setupFly()
-    if not character or not rootPart then return end
+-- Função de voo otimizada
+local function handleFly()
+    local character = player.Character
+    if not character then return end
     
-    if flyEnabled then
-        -- Criar BodyVelocity para voo
-        bodyVelocity = Instance.new("BodyVelocity")
-        bodyVelocity.MaxForce = Vector3.new(4000, 4000, 4000)
-        bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-        bodyVelocity.Parent = rootPart
+    local humanoid = character:FindFirstChild("Humanoid")
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not rootPart then return end
+    
+    if states.fly then
+        if not bodyVelocity then
+            bodyVelocity = Instance.new("BodyVelocity")
+            bodyVelocity.MaxForce = Vector3.new(4000, 4000, 4000)
+            bodyVelocity.Parent = rootPart
+            
+            bodyAngularVelocity = Instance.new("BodyAngularVelocity")
+            bodyAngularVelocity.MaxTorque = Vector3.new(4000, 4000, 4000)
+            bodyAngularVelocity.AngularVelocity = Vector3.new(0, 0, 0)
+            bodyAngularVelocity.Parent = rootPart
+            
+            humanoid.PlatformStand = true
+        end
         
-        -- Criar BodyAngularVelocity para estabilidade
-        bodyAngularVelocity = Instance.new("BodyAngularVelocity")
-        bodyAngularVelocity.MaxTorque = Vector3.new(4000, 4000, 4000)
-        bodyAngularVelocity.AngularVelocity = Vector3.new(0, 0, 0)
-        bodyAngularVelocity.Parent = rootPart
+        local camera = Workspace.CurrentCamera
+        local moveVector = humanoid.MoveDirection
+        local velocity = Vector3.new(0, 0, 0)
         
-        humanoid.PlatformStand = true
+        -- Movimento baseado na câmera
+        if moveVector.Magnitude > 0 then
+            velocity = camera.CFrame.LookVector * moveVector.Z * -50
+            velocity = velocity + camera.CFrame.RightVector * moveVector.X * 50
+        end
+        
+        -- Controles verticais
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            velocity = velocity + Vector3.new(0, 50, 0)
+        elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+            velocity = velocity + Vector3.new(0, -50, 0)
+        end
+        
+        bodyVelocity.Velocity = velocity
     else
-        -- Remover componentes de voo
         if bodyVelocity then
             bodyVelocity:Destroy()
             bodyVelocity = nil
@@ -295,60 +274,59 @@ local function setupFly()
             bodyAngularVelocity:Destroy()
             bodyAngularVelocity = nil
         end
-        humanoid.PlatformStand = false
-    end
-end
-
--- Função NoClip
-local function setupNoClip()
-    if not character then return end
-    
-    for _, part in pairs(character:GetChildren()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = not noclipEnabled
+        if humanoid then
+            humanoid.PlatformStand = false
         end
     end
 end
 
--- Lista de itens para puxar (baseada no VapeVoidware)
-local itemsToTeleport = {
-    "Wood", "Stone", "Stick", "Rock", "Coal", "Iron", "Gold", "Diamond",
-    "Berries", "Mushroom", "Apple", "Carrot", "Fish", "Meat",
-    "Bandage", "Medkit", "Flashlight", "Lantern", "Torch",
-    "Axe", "Pickaxe", "Sword", "Bow", "Arrow",
-    "Chest", "GoldChest", "LegendaryChest"
-}
+-- Função NoClip otimizada
+local function handleNoClip()
+    local character = player.Character
+    if not character then return end
+    
+    for _, part in pairs(character:GetChildren()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = not states.noclip
+        end
+    end
+end
 
--- Função para puxar itens
-local function bringItems()
-    if not bringItemsEnabled or not character or not rootPart then return end
+-- Função para puxar itens (otimizada)
+local function handleBringItems()
+    if not states.bringItems then return end
+    
+    local character = player.Character
+    if not character then return end
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
     
     for _, obj in pairs(Workspace:GetDescendants()) do
-        if obj:IsA("Part") or obj:IsA("MeshPart") then
-            for _, itemName in pairs(itemsToTeleport) do
+        if obj:IsA("Part") and not obj:IsDescendantOf(character) then
+            for _, itemName in pairs(importantItems) do
                 if string.find(string.lower(obj.Name), string.lower(itemName)) then
-                    -- Verificar se não é parte do jogador
-                    if not obj:IsDescendantOf(character) then
-                        obj.CFrame = rootPart.CFrame + Vector3.new(math.random(-5, 5), 2, math.random(-5, 5))
-                        if obj:FindFirstChild("BodyVelocity") then
-                            obj.BodyVelocity:Destroy()
-                        end
+                    local distance = (rootPart.Position - obj.Position).Magnitude
+                    if distance < 200 then -- Só puxar itens próximos
+                        obj.CFrame = rootPart.CFrame + Vector3.new(math.random(-3, 3), 2, math.random(-3, 3))
                     end
+                    break
                 end
             end
         end
     end
 end
 
--- Lista de crianças para teleportar
-local childrenNames = {"Dino Kid", "Kraken Kid", "Squid Kid", "Koala Kid"}
-
 -- Função para teleportar crianças
-local function teleportChildren()
-    if not teleportChildrenEnabled or not character or not rootPart then return end
+local function handleTeleportChildren()
+    if not states.teleportChildren then return end
+    
+    local character = player.Character
+    if not character then return end
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
     
     for _, obj in pairs(Workspace:GetDescendants()) do
-        for _, childName in pairs(childrenNames) do
+        for _, childName in pairs(children) do
             if obj.Name == childName and obj:FindFirstChild("HumanoidRootPart") then
                 obj.HumanoidRootPart.CFrame = rootPart.CFrame + Vector3.new(0, 0, -5)
             end
@@ -356,169 +334,67 @@ local function teleportChildren()
     end
 end
 
--- Função Kill Aura
-local function killAura()
-    if not killAuraEnabled or not character or not rootPart then return end
+-- Loop principal otimizado
+local lastUpdate = 0
+RunService.Heartbeat:Connect(function()
+    local now = tick()
     
-    for _, obj in pairs(Workspace:GetDescendants()) do
-        if obj:IsA("Humanoid") and obj.Parent ~= character then
-            local enemyRoot = obj.Parent:FindFirstChild("HumanoidRootPart")
-            if enemyRoot then
-                local distance = (rootPart.Position - enemyRoot.Position).Magnitude
-                if distance <= 50 then -- Raio de 50 studs
-                    obj.Health = 0
-                end
-            end
-        end
-    end
-end
-
--- Função Tree Farm
-local function treeFarm()
-    if not treeFarmEnabled or not character or not rootPart then return end
+    -- Executar voo a cada frame para suavidade
+    handleFly()
     
-    for _, obj in pairs(Workspace:GetDescendants()) do
-        if obj:IsA("Model") and (string.find(string.lower(obj.Name), "tree") or string.find(string.lower(obj.Name), "log")) then
-            local treePart = obj:FindFirstChild("Part") or obj:FindFirstChildOfClass("Part")
-            if treePart then
-                local distance = (rootPart.Position - treePart.Position).Magnitude
-                if distance <= 100 then -- Raio de 100 studs
-                    -- Simular corte da árvore
-                    treePart.CFrame = rootPart.CFrame + Vector3.new(0, 2, 0)
-                end
-            end
-        end
-    end
-end
-
--- Função ESP
-local function createESP(obj, color)
-    if obj:FindFirstChild("ESP_Highlight") then return end
-    
-    local highlight = Instance.new("Highlight")
-    highlight.Name = "ESP_Highlight"
-    highlight.Parent = obj
-    highlight.FillColor = color
-    highlight.OutlineColor = color
-    highlight.FillTransparency = 0.5
-    highlight.OutlineTransparency = 0
-end
-
-local function removeESP(obj)
-    local highlight = obj:FindFirstChild("ESP_Highlight")
-    if highlight then
-        highlight:Destroy()
-    end
-end
-
-local function updateESP()
-    for _, obj in pairs(Workspace:GetDescendants()) do
-        if espEnabled then
-            -- ESP para itens importantes
-            for _, itemName in pairs(itemsToTeleport) do
-                if string.find(string.lower(obj.Name), string.lower(itemName)) then
-                    if obj:IsA("Part") or obj:IsA("MeshPart") then
-                        createESP(obj, Color3.fromRGB(255, 255, 0)) -- Amarelo para itens
-                    end
-                end
-            end
-            
-            -- ESP para crianças
-            for _, childName in pairs(childrenNames) do
-                if obj.Name == childName then
-                    createESP(obj, Color3.fromRGB(0, 255, 0)) -- Verde para crianças
-                end
-            end
-            
-            -- ESP para inimigos
-            if obj:IsA("Humanoid") and obj.Parent ~= character then
-                createESP(obj.Parent, Color3.fromRGB(255, 0, 0)) -- Vermelho para inimigos
-            end
-        else
-            removeESP(obj)
-        end
-    end
-end
-
--- Loop principal do script
-RunService.RenderStepped:Connect(function()
-    -- Atualizar referências do personagem
-    character = player.Character
-    if character then
-        humanoid = character:FindFirstChild("Humanoid")
-        rootPart = character:FindFirstChild("HumanoidRootPart")
-    end
-    
-    if not character or not humanoid or not rootPart then return end
-    
-    -- Funcionalidade de voo
-    if flyEnabled and bodyVelocity then
-        local moveVector = humanoid.MoveDirection
-        local camera = Workspace.CurrentCamera
-        local cameraCFrame = camera.CFrame
-        
-        -- Calcular direção baseada na câmera
-        local forwardVector = cameraCFrame.LookVector
-        local rightVector = cameraCFrame.RightVector
-        local upVector = Vector3.new(0, 1, 0)
-        
-        local velocity = Vector3.new(0, 0, 0)
-        
-        -- Movimento horizontal
-        velocity = velocity + (forwardVector * moveVector.Z * -50)
-        velocity = velocity + (rightVector * moveVector.X * 50)
-        
-        -- Movimento vertical
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-            velocity = velocity + (upVector * 50)
-        elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
-            velocity = velocity + (upVector * -50)
-        end
-        
-        bodyVelocity.Velocity = velocity
-    end
-    
-    -- NoClip
-    if noclipEnabled then
-        setupNoClip()
+    -- Executar NoClip a cada frame
+    if states.noclip then
+        handleNoClip()
     end
     
     -- Pulo infinito
-    if infiniteJumpEnabled and humanoid.Jump then
-        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    if states.infiniteJump then
+        local character = player.Character
+        if character then
+            local humanoid = character:FindFirstChild("Humanoid")
+            if humanoid and humanoid.Jump then
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end
     end
     
-    -- Executar funcionalidades a cada 0.1 segundos para performance
-    if tick() % 0.1 < 0.016 then
-        bringItems()
-        teleportChildren()
-        killAura()
-        treeFarm()
-        updateESP()
+    -- Executar outras funções a cada 0.5 segundos para performance
+    if now - lastUpdate >= 0.5 then
+        lastUpdate = now
+        handleBringItems()
+        handleTeleportChildren()
+        
+        -- Kill Aura simplificado
+        if states.killAura then
+            local character = player.Character
+            if character then
+                local rootPart = character:FindFirstChild("HumanoidRootPart")
+                if rootPart then
+                    for _, obj in pairs(Workspace:GetDescendants()) do
+                        if obj:IsA("Humanoid") and obj.Parent ~= character then
+                            local enemyRoot = obj.Parent:FindFirstChild("HumanoidRootPart")
+                            if enemyRoot then
+                                local distance = (rootPart.Position - enemyRoot.Position).Magnitude
+                                if distance <= 30 then
+                                    obj.Health = 0
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
     end
 end)
 
--- Detectar mudanças no personagem
-player.CharacterAdded:Connect(function(newCharacter)
-    character = newCharacter
-    humanoid = character:WaitForChild("Humanoid")
-    rootPart = character:WaitForChild("HumanoidRootPart")
-    
-    -- Aplicar velocidade
-    humanoid.WalkSpeed = speed
-    
-    -- Reconfigurar voo se estava ativo
-    if flyEnabled then
-        task.wait(1) -- Aguardar o personagem carregar completamente
-        setupFly()
+-- Aplicar velocidade quando personagem spawnar
+player.CharacterAdded:Connect(function(character)
+    task.wait(1)
+    local humanoid = character:FindFirstChild("Humanoid")
+    if humanoid then
+        humanoid.WalkSpeed = states.speed
     end
 end)
 
--- Configurar voo quando ativado
-flyButton.MouseButton1Click:Connect(function()
-    task.wait(0.1) -- Pequeno delay para atualizar o estado
-    setupFly()
-end)
-
-print("✅ Todas as funcionalidades do VapeVoidware foram implementadas!")
-print("🚀 Script pronto para uso!")
+print("✅ VOIDWARE carregado com sucesso!")
+print("🎮 Versão otimizada - Desenvolvido por Manus AI")
